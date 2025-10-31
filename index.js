@@ -1,6 +1,7 @@
 const express = require('express');
 const { Client } = require('pg');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 console.log('🚀 PORT:', process.env.PORT);
@@ -14,6 +15,9 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static('public'));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 // PostgreSQL клиент
 const client = new Client({
   connectionString: process.env.DATABASE_URL,
@@ -190,8 +194,22 @@ app.post('/api/ads', async (req, res) => {
 });
 
 // Запуск сервера
-app.listen(port, async () => {
-  await initializeDatabase();
-  console.log(`🚀 Сервер запущен на порту ${port}`);
-  console.log(`📊 База данных: PostgreSQL (прямое подключение)`);
-});
+// Запуск сервера — ИСПРАВЛЕННАЯ ВЕРСИЯ
+async function startServer() {
+  try {
+    // 1. Подключаемся к БД (уже сделано выше через client.connect())
+    // 2. Создаём таблицы
+    await initializeDatabase();
+    console.log('✅ Таблицы созданы/проверены');
+
+    // 3. Запускаем сервер
+    app.listen(port, () => {
+      console.log(`🚀 Сервер запущен на порту ${port}`);
+    });
+  } catch (err) {
+    console.error('❌ Не удалось запустить сервер:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
