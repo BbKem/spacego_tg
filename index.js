@@ -21,7 +21,10 @@ const client = new Client({
 // Подключение к базе
 client.connect()
   .then(() => console.log('✅ Подключение к PostgreSQL установлено'))
-  .catch(err => console.error('❌ Ошибка подключения:', err));
+  .catch(err => {
+    console.error('❌ Ошибка подключения:', err);
+    process.exit(1); // Завершаем процесс, если нет подключения
+  });
 
 // Health check
 app.get('/api/health', async (req, res) => {
@@ -40,7 +43,6 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Создаем таблицы если их нет
 async function initializeDatabase() {
   try {
     // Таблица пользователей
@@ -76,6 +78,7 @@ async function initializeDatabase() {
     console.log('✅ Таблицы созданы/проверены');
   } catch (error) {
     console.error('❌ Ошибка создания таблиц:', error);
+    process.exit(1); // Завершаем процесс, если таблицы не созданы
   }
 }
 
@@ -121,12 +124,18 @@ app.get('/api/ads', async (req, res) => {
 });
 
 // API: Создать объявление
+// API: Создать объявление
 app.post('/api/ads', async (req, res) => {
   const { title, description, price, category, imageUrl, authorTelegramId } = req.body;
 
-  // Валидация
+  // Валидация обязательных полей
   if (!title || !description || !category) {
     return res.status(400).json({ error: 'Заполните обязательные поля: заголовок, описание и категория' });
+  }
+
+  // Проверка Telegram ID
+  if (!authorTelegramId) {
+    return res.status(400).json({ error: 'Не удалось определить пользователя. Пожалуйста, перезапустите приложение.' });
   }
 
   try {
@@ -138,9 +147,10 @@ app.post('/api/ads', async (req, res) => {
 
     let userId;
     if (userResult.rows.length === 0) {
+      // Создаем нового пользователя с минимальными данными
       const newUser = await client.query(
-        'INSERT INTO users (telegram_id, first_name) VALUES ($1, $2) RETURNING id',
-        [authorTelegramId, 'User']
+        'INSERT INTO users (telegram_id, first_name, username) VALUES ($1, $2, $3) RETURNING id',
+        [authorTelegramId, 'User', 'unknown'] // Добавляем username, чтобы избежать ошибки
       );
       userId = newUser.rows[0].id;
     } else {
